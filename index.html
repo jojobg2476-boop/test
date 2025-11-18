@@ -1,1 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>JoJo Surfers</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: linear-gradient(to right, #222, #555);
+    font-family: Arial, sans-serif;
+  }
+  #gameContainer {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #player {
+    position: absolute;
+    bottom: 50px;
+    left: 50px;
+    width: 50px;
+    height: 100px;
+    background: linear-gradient(45deg, #ff0, #f0f);
+    border: 4px solid #fff;
+    border-radius: 10px;
+    box-shadow: 0 0 20px #fff;
+  }
+  .obstacle {
+    position: absolute;
+    bottom: 50px;
+    width: 40px;
+    height: 40px;
+    background-color: red;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    animation: moveLeft 3s linear forwards;
+  }
+  @keyframes moveLeft {
+    from { left: 100%; }
+    to { left: -50px; }
+  }
+  #score {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    color: #fff;
+    font-size: 24px;
+  }
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <div id="player"></div>
+  <div id="score">Score: 0</div>
+</div>
 
+<script>
+  const player = document.getElementById('player');
+  const gameContainer = document.getElementById('gameContainer');
+  const scoreDisplay = document.getElementById('score');
+
+  let isJumping = false;
+  let score = 0;
+  let gameOver = false;
+
+  // Saut
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !isJumping) {
+      jump();
+    }
+  });
+
+  function jump() {
+    isJumping = true;
+    let jumpHeight = 150;
+    let jumpDuration = 500;
+    let start = null;
+
+    function animateJump(timestamp) {
+      if (!start) start = timestamp;
+      let progress = timestamp - start;
+      if (progress < jumpDuration) {
+        let y = Math.sin((progress / jumpDuration) * Math.PI) * jumpHeight;
+        player.style.bottom = (50 + y) + 'px';
+        requestAnimationFrame(animateJump);
+      } else {
+        player.style.bottom = '50px';
+        isJumping = false;
+      }
+    }
+
+    requestAnimationFrame(animateJump);
+  }
+
+  // Générer obstacles
+  function createObstacle() {
+    if (gameOver) return;
+    const obstacle = document.createElement('div');
+    obstacle.className = 'obstacle';
+    obstacle.style.left = '100%';
+    gameContainer.appendChild(obstacle);
+
+    // Vérifier collision
+    obstacle.addEventListener('animationiteration', () => {
+      obstacle.remove();
+    });
+
+    // Vérifier collision
+    const collisionCheck = setInterval(() => {
+      if (detectCollision(player, obstacle)) {
+        alert('Game Over! Votre score: ' + score);
+        gameOver = true;
+        clearInterval(collisionCheck);
+        clearInterval(spawnInterval);
+      }
+    }, 50);
+  }
+
+  // Détection collision
+  function detectCollision(player, obstacle) {
+    const pRect = player.getBoundingClientRect();
+    const oRect = obstacle.getBoundingClientRect();
+    return (
+      oRect.left < pRect.right &&
+      oRect.right > pRect.left &&
+      oRect.top < pRect.bottom &&
+      oRect.bottom > pRect.top
+    );
+  }
+
+  // Créer des obstacles à intervalle régulier
+  const spawnInterval = setInterval(() => {
+    createObstacle();
+    score++;
+    scoreDisplay.textContent = 'Score: ' + score;
+  }, 1500);
+</script>
+</body>
+</html>
