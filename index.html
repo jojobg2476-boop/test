@@ -1,139 +1,177 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lookup Search</title>
-
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #0a0a0a;
-            color: white;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        h1 {
-            margin-top: 60px;
-            font-size: 3rem;
-            font-weight: 700;
-            letter-spacing: 2px;
-        }
-
-        .search-box {
-            margin-top: 30px;
-            display: flex;
-            gap: 10px;
-        }
-
-        input {
-            width: 330px;
-            padding: 14px;
-            border: none;
-            outline: none;
-            border-radius: 8px;
-            font-size: 18px;
-        }
-
-        button {
-            padding: 15px 22px;
-            background: #007bff;
-            border: none;
-            border-radius: 8px;
-            color: white;
-            cursor: pointer;
-            font-size: 17px;
-        }
-
-        button:hover {
-            background: #0065d6;
-        }
-
-        .result {
-            margin-top: 40px;
-            width: 90%;
-            max-width: 600px;
-            background: #111;
-            border: 1px solid #333;
-            padding: 20px;
-            border-radius: 10px;
-            display: none;
-        }
-
-        .result h2 {
-            margin-top: 0;
-        }
-
-        .error {
-            color: #ff5555;
-            margin-top: 20px;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lookup Pro — Site & Numéro</title>
+  <style>
+    :root{
+      --bg:#071022; --card:#0b1420; --accent:#06b6d4; --muted:#94a3b8; --text:#e6eef6;
+    }
+    *{box-sizing:border-box;font-family:Inter,system-ui,Arial}
+    body{margin:0;background:linear-gradient(180deg,#041021,#07182b);color:var(--text);padding:28px}
+    .wrap{max-width:980px;margin:0 auto}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+    h1{margin:0;font-size:24px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding:18px;border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,0.6)}
+    .controls{display:flex;gap:10px;margin-top:10px}
+    input[type=text]{flex:1;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:var(--text)}
+    button{padding:12px 16px;border-radius:10px;border:0;background:linear-gradient(90deg,#3abff8,#06b6d4);color:#021;cursor:pointer;font-weight:600}
+    .cols{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-top:16px}
+    .box{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px}
+    .muted{color:var(--muted);font-size:13px}
+    .kv{display:flex;gap:8px;margin:6px 0}
+    .kv strong{width:140px;color:var(--accent)}
+    pre.snip{background:#02111b;padding:10px;border-radius:8px;color:#bcd;white-space:pre-wrap;overflow:auto}
+    img.favicon{width:36px;height:36px;border-radius:6px}
+    .error{color:#ff7b7b;font-weight:700}
+    @media(max-width:760px){.cols{grid-template-columns:1fr}.controls{flex-direction:column}}
+  </style>
 </head>
 <body>
+  <div class="wrap">
+    <header>
+      <h1>Lookup Pro</h1>
+      <div class="muted">WHOIS • SSL • IP • Tech • Numéro</div>
+    </header>
 
-    <h1>Lookup</h1>
+    <div class="card">
+      <div>
+        <div class="muted">Colle une URL (ex: example.com) ou un numéro (ex: +33612345678)</div>
+        <div class="controls">
+          <input id="q" type="text" placeholder="ex: example.com ou +33612345678" />
+          <button id="search">Rechercher</button>
+        </div>
+      </div>
 
-    <div class="search-box">
-        <input id="query" type="text" placeholder="Entrez un lien ou un numéro..." />
-        <button onclick="search()">Rechercher</button>
+      <div class="cols">
+        <div class="box" id="main">
+          <div id="summary"></div>
+          <div id="content"></div>
+        </div>
+
+        <div class="box">
+          <h3 class="muted">Infos</h3>
+          <div class="muted small">Le frontend appelle un backend. Configure l'URL publique de l'API ci-dessous (après déploiement).</div>
+          <div style="margin-top:10px" class="kv"><strong>API_BASE</strong><div id="apiBase" class="muted">MODIFIER_APRES_DEPLOIEMENT</div></div>
+          <div style="margin-top:10px" class="muted">Optionnel : définir NUMVERIFY_KEY dans les variables d'environnement du backend pour obtenir opérateur/zone des numéros.</div>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <div id="error" class="error"></div>
+<script>
+/*
+  Mettez ici l'URL publique de votre backend (ex: https://lookup-backend.onrender.com/api)
+  Après déploiement changez la valeur ci-dessous.
+*/
+const API_BASE = "REPLACE_WITH_YOUR_BACKEND_URL/api";
 
-    <div id="result" class="result">
-        <h2>Résultat</h2>
-        <p id="data"></p>
+function el(id){return document.getElementById(id)}
+function showError(msg){el('summary').innerHTML = `<p class="error">${escapeHtml(msg)}</p>`}
+function escapeHtml(s){if(s==null) return ''; return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')}
+
+async function search(){
+  const q = el('q').value.trim();
+  el('summary').innerHTML=''; el('content').innerHTML='';
+  if(!q) return showError('Entre une URL ou un numéro');
+
+  const isUrl = /^(https?:\/\/)?([\\w-]+\\.)+[\\w-]+/i.test(q);
+
+  try{
+    el('summary').innerHTML = `<div class="muted">Recherche en cours...</div>`;
+    const endpoint = isUrl ? 'inspect' : 'phone';
+    const body = isUrl ? { query: q } : { number: q };
+    const resp = await fetch(`${API_BASE}/${endpoint}`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const json = await resp.json();
+    if(!resp.ok) throw new Error(json.error || json.details || 'Erreur serveur');
+    isUrl ? renderUrl(json) : renderPhone(json);
+  }catch(err){
+    showError(err.message || String(err));
+  }
+}
+
+function renderUrl(data){
+  const summary = `
+    <div style="display:flex;gap:12px;align-items:center">
+      ${data.favicon?`<img class="favicon" src="${escapeHtml(data.favicon)}" onerror="this.style.display='none'">`:''}
+      <div>
+        <div style="font-weight:700">${escapeHtml(data.title || data.url)}</div>
+        <div class="muted">${escapeHtml(data.url)}</div>
+      </div>
     </div>
+  `;
+  el('summary').innerHTML = summary;
 
-    <script>
-        function search() {
-            const q = document.getElementById("query").value.trim();
-            const resultBox = document.getElementById("result");
-            const errorBox = document.getElementById("error");
-            const dataBox = document.getElementById("data");
+  let html = '';
+  html += `<div class="kv"><strong>Title</strong><div>${escapeHtml(data.title||'-')}</div></div>`;
+  html += `<div class="kv"><strong>Description</strong><div>${escapeHtml(data.description||'-')}</div></div>`;
 
-            errorBox.textContent = "";
-            resultBox.style.display = "none";
+  html += `<div style="margin-top:12px;font-weight:600;color:var(--accent)">WHOIS</div>`;
+  if(data.whois && !data.whois.error){
+    html += `<div class="kv"><strong>Domaine</strong><div>${escapeHtml(data.whois.domain||'-')}</div></div>`;
+    html += `<div class="kv"><strong>Créé le</strong><div>${escapeHtml(data.whois.created||'-')}</div></div>`;
+    html += `<div class="kv"><strong>Expire le</strong><div>${escapeHtml(data.whois.expires||'-')}</div></div>`;
+    html += `<div class="kv"><strong>Registrar</strong><div>${escapeHtml(data.whois.registrar||'-')}</div></div>`;
+    html += `<div class="kv"><strong>Nameservers</strong><div>${escapeHtml((data.whois.nameservers||[]).join(', ')||'-')}</div></div>`;
+    html += `<div class="kv"><strong>Owner (raw)</strong><div>${escapeHtml(data.whois.owner||'-')}</div></div>`;
+  } else {
+    html += `<div class="muted">WHOIS indisponible (${escapeHtml(data.whois && data.whois.error ? data.whois.error : '—')})</div>`;
+  }
 
-            if (!q) {
-                errorBox.textContent = "❌ Veuillez entrer un lien ou un numéro.";
-                return;
-            }
+  html += `<div style="margin-top:12px;font-weight:600;color:var(--accent)">Serveur & SSL</div>`;
+  html += `<div class="kv"><strong>Status</strong><div>${escapeHtml(String(data.status||'-'))}</div></div>`;
+  html += `<div class="kv"><strong>Server</strong><div>${escapeHtml(data.headers && data.headers.server || '-')}</div></div>`;
+  html += `<div class="kv"><strong>Content-Type</strong><div>${escapeHtml(data.headers && data.headers['content-type'] || '-')}</div></div>`;
+  if(data.ssl && !data.ssl.error){
+    html += `<div class="kv"><strong>Certificat</strong><div>${escapeHtml(data.ssl.subject || '-')}</div></div>`;
+    html += `<div class="kv"><strong>Valide</strong><div>${escapeHtml((data.ssl.valid_from||'-') + ' → ' + (data.ssl.valid_to||'-'))}</div></div>`;
+  } else {
+    html += `<div class="muted">SSL: ${escapeHtml(data.ssl && data.ssl.error ? data.ssl.error : '—')}</div>`;
+  }
 
-            // Détection simple du type d’entrée
-            let info = "";
+  html += `<div style="margin-top:12px;font-weight:600;color:var(--accent)">IP & GEO</div>`;
+  if(data.ip_info && !data.ip_info.error){
+    html += `<div class="kv"><strong>IP</strong><div>${escapeHtml(data.ip_info.query||'-')}</div></div>`;
+    html += `<div class="kv"><strong>Pays/ville</strong><div>${escapeHtml((data.ip_info.country||'-') + ' / ' + (data.ip_info.city||'-'))}</div></div>`;
+    html += `<div class="kv"><strong>ISP</strong><div>${escapeHtml(data.ip_info.isp||'-')}</div></div>`;
+    html += `<div class="kv"><strong>Org/AS</strong><div>${escapeHtml((data.ip_info.org||'-') + ' / ' + (data.ip_info.as||'-'))}</div></div>`;
+  } else {
+    html += `<div class="muted">IP/GEO: ${escapeHtml(data.ip_info && data.ip_info.error ? data.ip_info.error : '—')}</div>`;
+  }
 
-            if (q.match(/^https?:\/\//i)) {
-                info = `
-                    🔗 <strong>Type :</strong> Lien détecté<br>
-                    🌐 <strong>Domaine :</strong> ${q}<br><br>
-                    ⚠️ Pour avoir les vraies infos (propriétaire, création du site,
-                    serveur, DNS, etc.) il faudra connecter un backend WHOIS/OSINT.
-                `;
-            } 
-            else if (q.match(/^\+?\d{6,15}$/)) {
-                info = `
-                    📱 <strong>Type :</strong> Numéro détecté<br>
-                    👉 <strong>Numéro :</strong> ${q}<br><br>
-                    ⚠️ Pour obtenir les vraies infos (pays, opérateur, éventuelle ligne VOIP),
-                    un backend avec API télécom sera nécessaire.
-                `;
-            } 
-            else {
-                info = `
-                    ℹ️ Pas reconnu.<br><br>
-                    Essayez un lien (https://...) ou un numéro (+33...).
-                `;
-            }
+  html += `<div style="margin-top:12px;font-weight:600;color:var(--accent)">Technos (heuristique)</div>`;
+  html += `<div class="kv"><strong>Techs détectées</strong><div>${escapeHtml((data.tech || []).join(', ') || '-')}</div></div>`;
 
-            dataBox.innerHTML = info;
-            resultBox.style.display = "block";
-        }
-    </script>
+  html += `<div style="margin-top:12px;font-weight:600;color:var(--accent)">Extrait</div>`;
+  html += `<pre class="snip">${escapeHtml(data.snippet || '')}</pre>`;
 
+  el('content').innerHTML = html;
+  // show api base to user (helpful)
+  document.getElementById('apiBase').textContent = API_BASE;
+}
+
+function renderPhone(d){
+  let html = '';
+  html += `<div class="kv"><strong>Entrée</strong><div>${escapeHtml(d.raw||'-')}</div></div>`;
+  html += `<div class="kv"><strong>International</strong><div>${escapeHtml(d.international||'-')}</div></div>`;
+  html += `<div class="kv"><strong>National</strong><div>${escapeHtml(d.national||'-')}</div></div>`;
+  html += `<div class="kv"><strong>Pays</strong><div>${escapeHtml(d.country||'-')}</div></div>`;
+  html += `<div class="kv"><strong>Valide</strong><div>${escapeHtml(String(d.valid||false))}</div></div>`;
+  if(d.operator) html += `<div class="kv"><strong>Opérateur</strong><div>${escapeHtml(d.operator)}</div></div>`;
+  if(d.geolocation) html += `<div class="kv"><strong>Région</strong><div>${escapeHtml(d.geolocation)}</div></div>`;
+  if(d.raw_api) html += `<div class="muted">Données API (raw): ${escapeHtml(JSON.stringify(d.raw_api).slice(0,400))}...</div>`;
+  el('summary').innerHTML = `<div style="font-weight:700">Info numéro</div><div class="muted">${escapeHtml(d.raw||'')}</div>`;
+  el('content').innerHTML = html;
+  document.getElementById('apiBase').textContent = API_BASE;
+}
+
+el('search').addEventListener('click', search);
+el('q').addEventListener('keydown', e => { if(e.key === 'Enter') search(); });
+</script>
 </body>
 </html>
