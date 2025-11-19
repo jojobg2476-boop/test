@@ -1,280 +1,230 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>JoJo Surfers - Version Réaliste</title>
-<style>
-  body {
-    margin: 0;
-    overflow: hidden;
-    font-family: Arial, sans-serif;
-    background: #222;
-  }
-
-  /* Fond dynamique */
-  #background {
-    position: absolute;
-    width: 100%;
-    height: 100vh;
-    background: linear-gradient(to top, #0f2027, #203a43, #2c5364);
-    background-repeat: repeat-x;
-    background-size: contain;
-    z-index: -1;
-  }
-
-  /* Skyline ou ville stylisée */
-  #cityscape {
-    position: absolute;
-    bottom: 0;
-    width: 100%;
-    height: 150px;
-    background: #111;
-    background-image: 
-      linear-gradient(to right, #444, #666),
-      linear-gradient(to right, #444, #666);
-    background-repeat: repeat-x;
-    background-position: bottom, bottom;
-    background-size: 100px 150px, 50px 150px;
-  }
-
-  /* Casier comme décor */
-  #casier {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 100px;
-    height: 200px;
-    background-color: #555;
-    border: 4px solid #222;
-    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-    background-image: repeating-linear-gradient(
-      0deg,
-      #444,
-      #444 10px,
-      #555 10px,
-      #555 20px
-    );
-  }
-
-  /* Personnage stylisé (sprite simple) */
-  #player {
-    position: absolute;
-    bottom: 50px;
-    left: 50px;
-    width: 50px;
-    height: 100px;
-    background-image: url('https://i.imgur.com/7Q8Pz7X.png'); /* Image stylisée */
-    background-size: contain;
-    background-repeat: no-repeat;
-  }
-
-  /* Obstacles (caisses, barils, panneaux) */
-  .obstacle {
-    position: absolute;
-    bottom: 50px;
-    width: 40px;
-    height: 40px;
-    border-radius: 5px;
-    border: 2px solid #fff;
-    animation: moveLeft 3s linear forwards;
-  }
-
-  /* Différents obstacles avec couleurs */
-  .barrel { background-color: #8B4513; }
-  .box { background-color: #A0522D; }
-  .panneau { background-color: #228B22; width: 60px; height: 20px; border-radius: 2px; }
-
-  @keyframes moveLeft {
-    from { left: 100%; }
-    to { left: -50px; }
-  }
-
-  /* Interface score et vie */
-  #scoreContainer {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    color: #fff;
-    font-size: 20px;
-    display: flex;
-    gap: 20px;
-  }
-  #score, #lives {
-    background: rgba(0,0,0,0.5);
-    padding: 5px 10px;
-    border-radius: 8px;
-  }
-
-  /* Bouton restart */
-  #restartBtn {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    padding: 15px 30px;
-    font-size: 20px;
-    background-color: #444;
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    display: none;
-  }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lookup — URL & Numéro (HTML)</title>
+  <style>
+    :root{--bg:#f6f8fb;--card:#ffffff;--muted:#6b7280;--accent:#0b74de}
+    body{font-family:Inter,system-ui,Segoe UI,Arial; background:var(--bg); margin:0;padding:32px; color:#111}
+    .container{max-width:880px;margin:0 auto}
+    .card{background:var(--card);padding:20px;border-radius:12px;box-shadow:0 6px 20px rgba(16,24,40,0.06)}
+    h1{margin:0 0 12px;font-size:20px}
+    .row{display:flex;gap:8px}
+    input[type="text"]{flex:1;padding:12px;border-radius:10px;border:1px solid #e6e9ef;font-size:15px}
+    button{background:var(--accent);color:white;padding:10px 14px;border-radius:10px;border:0;cursor:pointer}
+    .muted{color:var(--muted);font-size:14px}
+    .result{margin-top:18px}
+    .field{margin-bottom:12px}
+    .snippet{white-space:pre-wrap;background:#f4f6fa;padding:12px;border-radius:8px;font-size:14px;border:1px solid #eef2ff}
+    .favicon{width:48px;height:48px;border-radius:8px;object-fit:cover;border:1px solid #eee}
+    .error{color:#b91c1c}
+    .hint{font-size:13px;color:#374151}
+    small{color:var(--muted)}
+    .kv{display:flex;gap:8px;align-items:flex-start}
+    .kv strong{width:140px;display:inline-block}
+    .badge{display:inline-block;padding:6px 8px;border-radius:999px;background:#eef2ff;color:#064e9a;font-size:13px}
+  </style>
+  <!-- libphonenumber-js (bundle) -->
+  <script src="https://unpkg.com/libphonenumber-js@1.9.48/bundle/libphonenumber-js.min.js"></script>
 </head>
 <body>
+  <div class="container">
+    <div class="card">
+      <h1>Lookup — URL & Numéro</h1>
+      <p class="muted">Colle une adresse web (ex: <code>https://example.com</code> ou <code>example.com</code>) ou un numéro de téléphone (ex: <code>+33612345678</code> ou <code>0612345678</code>).</p>
 
-<!-- Background et décor -->
-<div id="background"></div>
-<div id="cityscape"></div>
-<div id="casier"></div>
+      <form id="form" class="row" onsubmit="return false;">
+        <input id="query" type="text" placeholder="Collez une URL ou un numéro..." autocomplete="off" />
+        <button id="searchBtn">Rechercher</button>
+      </form>
 
-<!-- Interface -->
-<div id="scoreContainer">
-  <div id="score">Score: 0</div>
-  <div id="lives">Vies: 3</div>
-</div>
+      <p class="hint" id="hint">Le fetch d'une page externe peut échouer à cause du CORS. Si tu veux une récupération fiable pour tous les sites, exécute un petit backend (ex: Node/Express) qui fait le fetch côté serveur.</p>
 
-<!-- Personnage -->
-<div id="player"></div>
-
-<!-- Bouton restart -->
-<button id="restartBtn">Recommencer</button>
-
-<!-- Musique de fond -->
-<audio id="bgMusic" src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" loop autoplay></audio>
+      <div id="result" class="result"></div>
+    </div>
+  </div>
 
 <script>
-  const player = document.getElementById('player');
-  const scoreDisplay = document.getElementById('score');
-  const livesDisplay = document.getElementById('lives');
-  const restartBtn = document.getElementById('restartBtn');
-  const bgMusic = document.getElementById('bgMusic');
+/* ---- Helpers ---- */
+function looksLikeUrl(s) {
+  // détecte s'il contient un domaine / schéma
+  const urlRegex = /^(https?:\\/\\/)?([\\w-]+\\.)+[\\w-]+(\\/.*)?$/i;
+  return urlRegex.test(s.trim());
+}
+function ensureProtocol(s) {
+  if (!/^https?:\\/\\//i.test(s)) return 'http://' + s;
+  return s;
+}
 
-  let isJumping = false;
-  let score = 0;
-  let lives = 3;
-  let gameOver = false;
-  let obstacles = [];
+/* ---- DOM ---- */
+const form = document.getElementById('form');
+const queryEl = document.getElementById('query');
+const resultEl = document.getElementById('result');
+const searchBtn = document.getElementById('searchBtn');
 
-  // Saut
-  document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && !isJumping && !gameOver) {
-      jump();
-    }
-  });
+form.addEventListener('submit', handleSearch);
+searchBtn.addEventListener('click', handleSearch);
 
-  function jump() {
-    isJumping = true;
-    const jumpHeight = 150;
-    const jumpDuration = 500;
-    const start = performance.now();
-
-    function animateJump(timestamp) {
-      const progress = timestamp - start;
-      if (progress < jumpDuration) {
-        const y = Math.sin((progress / jumpDuration) * Math.PI) * jumpHeight;
-        player.style.bottom = (50 + y) + 'px';
-        requestAnimationFrame(animateJump);
-      } else {
-        player.style.bottom = '50px';
-        isJumping = false;
-      }
-    }
-
-    requestAnimationFrame(animateJump);
+async function handleSearch(e) {
+  e && e.preventDefault();
+  resultEl.innerHTML = '';
+  const raw = queryEl.value.trim();
+  if (!raw) {
+    resultEl.innerHTML = '<p class="error">Entrez une URL ou un numéro.</p>';
+    return;
   }
 
-  // Créer obstacle
-  function createObstacle() {
-    if (gameOver) return;
+  // Détecter URL ou numéro
+  if (looksLikeUrl(raw)) {
+    await lookupUrl(raw);
+  } else {
+    lookupPhone(raw);
+  }
+}
 
-    const obstacle = document.createElement('div');
-    obstacle.className = 'obstacle';
+/* ---- URL lookup (via proxy CORS public) ---- */
+async function lookupUrl(input) {
+  const url = ensureProtocol(input);
+  const proxyBase = 'https://api.allorigins.win/raw?url='; // proxy gratuit (limites)
+  resultEl.innerHTML = '<p class="muted">Récupération de la page… (via proxy CORS public)</p>';
 
-    // Choisir un type d'obstacle aléatoire
-    const rand = Math.random();
-    if (rand < 0.4) {
-      obstacle.classList.add('box');
-    } else if (rand < 0.8) {
-      obstacle.classList.add('barrel');
+  try {
+    const fetchUrl = proxyBase + encodeURIComponent(url);
+    const resp = await fetch(fetchUrl, { method: 'GET' });
+
+    if (!resp.ok) {
+      resultEl.innerHTML = `<p class="error">Échec HTTP (${resp.status}). Impossible de récupérer la page via le proxy.</p>`;
+      return;
+    }
+
+    const text = await resp.text();
+
+    // Parser le HTML pour extraire title / meta / favicon / snippet
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'text/html');
+
+    const title = (doc.querySelector('head > title') && doc.querySelector('head > title').innerText) || null;
+    const metaDesc = (doc.querySelector('meta[name=\"description\"]') && doc.querySelector('meta[name=\"description\"]').getAttribute('content')) ||
+                     (doc.querySelector('meta[property=\"og:description\"]') && doc.querySelector('meta[property=\"og:description\"]').getAttribute('content')) ||
+                     null;
+
+    // favicon detection
+    const iconLink = doc.querySelector('link[rel~=\"icon\"]') || doc.querySelector('link[rel=\"shortcut icon\"]') || doc.querySelector('link[rel=\"apple-touch-icon\"]');
+    let favicon = iconLink ? iconLink.getAttribute('href') : null;
+    if (favicon) {
+      try {
+        // rendre URL absolue si besoin
+        const base = new URL(url);
+        favicon = new URL(favicon, base).toString();
+      } catch(err) {
+        // ignore
+      }
     } else {
-      obstacle.classList.add('panneau');
-      obstacle.style.width = '60px';
-      obstacle.style.height = '20px';
+      // fallback /favicon.ico
+      try { favicon = new URL('/favicon.ico', new URL(url)).toString(); } catch(e){ favicon = null; }
     }
 
-    obstacle.style.left = '100%';
-    gameContainer.appendChild(obstacle);
-    obstacles.push(obstacle);
-
-    // Vérifier collision
-    const collisionCheck = setInterval(() => {
-      if (detectCollision(player, obstacle)) {
-        lives--;
-        livesDisplay.textContent = 'Vies: ' + lives;
-        if (lives <= 0) {
-          endGame();
-        }
-        obstacle.remove();
-        clearInterval(collisionCheck);
-      }
-    }, 50);
-
-    // Nettoyer après la fin de l'animation
-    obstacle.addEventListener('animationend', () => {
-      obstacle.remove();
-      obstacles = obstacles.filter(o => o !== obstacle);
-    });
-  }
-
-  // Détection collision
-  function detectCollision(player, obstacle) {
-    const pRect = player.getBoundingClientRect();
-    const oRect = obstacle.getBoundingClientRect();
-    return (
-      oRect.left < pRect.right &&
-      oRect.right > pRect.left &&
-      oRect.top < pRect.bottom &&
-      oRect.bottom > pRect.top
-    );
-  }
-
-  // Gestion du score
-  function updateScore() {
-    score++;
-    scoreDisplay.textContent = 'Score: ' + score;
-  }
-
-  // Fonction fin de jeu
-  function endGame() {
-    gameOver = true;
-    alert('Jeu terminé ! Votre score : ' + score);
-    document.getElementById('restartBtn').style.display = 'block';
-  }
-
-  // Recommencer
-  document.getElementById('restartBtn').addEventListener('click', () => {
-    lives = 3;
-    score = 0;
-    gameOver = false;
-    livesDisplay.textContent = 'Vies: ' + lives;
-    scoreDisplay.textContent = 'Score: ' + score;
-    document.getElementById('restartBtn').style.display = 'none';
-
-    // Nettoyer obstacles
-    obstacles.forEach(o => o.remove());
-    obstacles = [];
-  });
-
-  // Spawner d'obstacles
-  const obstacleInterval = setInterval(() => {
-    if (!gameOver) {
-      createObstacle();
-      updateScore();
+    // snippet: premier texte significatif
+    let bodyText = '';
+    if (doc.body) {
+      bodyText = doc.body.innerText.replace(/\\s+/g, ' ').trim();
     }
-  }, 1500);
+    const snippet = bodyText.slice(0, 800);
+
+    // Affichage résultats
+    resultEl.innerHTML = `
+      <div class="kv field">
+        <div>
+          ${favicon ? `<img src="${favicon}" alt="favicon" class="favicon" onerror="this.style.display='none'">` : ''}
+        </div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:10px;justify-content:space-between">
+            <div>
+              <div style="font-weight:600">${escapeHtml(title || url)}</div>
+              <div style="font-size:13px;color:var(--muted)">${escapeHtml(url)}</div>
+            </div>
+            <div><span class="badge">récupéré via proxy</span></div>
+          </div>
+          ${metaDesc ? `<p style="margin-top:8px" class="muted">${escapeHtml(metaDesc)}</p>` : ''}
+        </div>
+      </div>
+
+      <div class="field">
+        <strong>Extrait :</strong>
+        <div class="snippet">${escapeHtml(snippet || '(aucun texte trouvé)')}</div>
+      </div>
+
+      <div class="field">
+        <strong>Détails techniques</strong>
+        <div class="muted" style="margin-top:6px">Remarque : le proxy public masque le code de statut original et certains en-têtes. Pour obtenir le statut HTTP réel / en-têtes, utilisez un fetch côté serveur (backend).</div>
+      </div>
+    `;
+  } catch (err) {
+    resultEl.innerHTML = `<p class="error">Erreur lors de la récupération : ${escapeHtml(err.message)}</p>
+      <p class="muted">Solutions :<br>
+      • Utiliser un backend (Node/Express) qui fait le fetch côté serveur (recommandé).<br>
+      • Ou essayer un autre proxy CORS. Les proxys publics ont des limites et peuvent échouer.</p>`;
+  }
+}
+
+/* ---- Phone lookup (libphonenumber-js) ---- */
+function lookupPhone(raw) {
+  try {
+    // util: essayer avec numéro tel national (FR par défaut si pas d'indicatif)
+    const input = raw.replace(/[\\s\\-().]/g, '');
+    // lib export is in global libphonenumber (bundle)
+    const { parsePhoneNumberFromString } = libphonenumber;
+    let phone;
+    // essaye en tant que numéro international s'il commence par +
+    if (input.startsWith('+')) {
+      phone = parsePhoneNumberFromString(input);
+    } else {
+      // par défaut FR (tu peux changer 'FR' si tu veux)
+      phone = parsePhoneNumberFromString(input, 'FR');
+    }
+
+    if (!phone) {
+      resultEl.innerHTML = `<p class="error">Impossible d'analyser le numéro.</p>`;
+      return;
+    }
+
+    const international = phone.formatInternational();
+    const national = phone.formatNational();
+    const country = phone.country || '—';
+    const valid = phone.isValid();
+    const type = (phone.getType && phone.getType()) || '—';
+
+    resultEl.innerHTML = `
+      <div class="field"><strong>Numéro analysé</strong></div>
+      <div class="field">
+        <div class="kv"><strong>Entrée :</strong><div>${escapeHtml(raw)}</div></div>
+        <div class="kv"><strong>International :</strong><div>${escapeHtml(international)}</div></div>
+        <div class="kv"><strong>National :</strong><div>${escapeHtml(national)}</div></div>
+        <div class="kv"><strong>Pays (code) :</strong><div>${escapeHtml(country)}</div></div>
+        <div class="kv"><strong>Valide :</strong><div>${valid ? '<span class=\"badge\">Oui</span>' : '<span class=\"error\">Non</span>'}</div></div>
+        <div class="kv"><strong>Type :</strong><div>${escapeHtml(String(type))}</div></div>
+      </div>
+      <div class="field">
+        <small class="muted">Astuce : pour plus d'infos (opérateur, localisation) il faut interroger un service payant d'API de lookup.</small>
+      </div>
+    `;
+  } catch (err) {
+    resultEl.innerHTML = `<p class="error">Erreur d'analyse : ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+/* ---- Utilities ---- */
+function escapeHtml(s) {
+  if (!s && s !== 0) return '';
+  return String(s)
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'",'&#39;');
+}
+
 </script>
 </body>
 </html>
