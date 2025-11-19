@@ -2,229 +2,125 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Lookup — URL & Numéro (HTML)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lookup — URL & Numéro</title>
+
   <style>
-    :root{--bg:#f6f8fb;--card:#ffffff;--muted:#6b7280;--accent:#0b74de}
-    body{font-family:Inter,system-ui,Segoe UI,Arial; background:var(--bg); margin:0;padding:32px; color:#111}
-    .container{max-width:880px;margin:0 auto}
-    .card{background:var(--card);padding:20px;border-radius:12px;box-shadow:0 6px 20px rgba(16,24,40,0.06)}
-    h1{margin:0 0 12px;font-size:20px}
-    .row{display:flex;gap:8px}
-    input[type="text"]{flex:1;padding:12px;border-radius:10px;border:1px solid #e6e9ef;font-size:15px}
-    button{background:var(--accent);color:white;padding:10px 14px;border-radius:10px;border:0;cursor:pointer}
-    .muted{color:var(--muted);font-size:14px}
-    .result{margin-top:18px}
-    .field{margin-bottom:12px}
-    .snippet{white-space:pre-wrap;background:#f4f6fa;padding:12px;border-radius:8px;font-size:14px;border:1px solid #eef2ff}
-    .favicon{width:48px;height:48px;border-radius:8px;object-fit:cover;border:1px solid #eee}
-    .error{color:#b91c1c}
-    .hint{font-size:13px;color:#374151}
-    small{color:var(--muted)}
-    .kv{display:flex;gap:8px;align-items:flex-start}
-    .kv strong{width:140px;display:inline-block}
-    .badge{display:inline-block;padding:6px 8px;border-radius:999px;background:#eef2ff;color:#064e9a;font-size:13px}
+    body { font-family: Arial; background:#f5f6fa; padding:40px; }
+    .box { max-width:700px; margin:auto; background:white; padding:20px; border-radius:12px; box-shadow:0 4px 18px rgba(0,0,0,0.08); }
+    input { width:80%; padding:12px; border-radius:8px; border:1px solid #ccc; }
+    button { padding:12px 18px; border-radius:8px; border:0; background:#0066ff; color:white; cursor:pointer; }
+    button:hover { opacity:0.9; }
+    .result { margin-top:20px; }
+    .error { color:#c0392b; font-weight:bold; }
+    .snippet { background:#f0f2f7; padding:10px; border-radius:6px; white-space:pre-wrap; }
+    img.favicon { width:40px; height:40px; border-radius:6px; margin-bottom:10px; }
   </style>
-  <!-- libphonenumber-js (bundle) -->
+
   <script src="https://unpkg.com/libphonenumber-js@1.9.48/bundle/libphonenumber-js.min.js"></script>
 </head>
 <body>
-  <div class="container">
-    <div class="card">
-      <h1>Lookup — URL & Numéro</h1>
-      <p class="muted">Colle une adresse web (ex: <code>https://example.com</code> ou <code>example.com</code>) ou un numéro de téléphone (ex: <code>+33612345678</code> ou <code>0612345678</code>).</p>
 
-      <form id="form" class="row" onsubmit="return false;">
-        <input id="query" type="text" placeholder="Collez une URL ou un numéro..." autocomplete="off" />
-        <button id="searchBtn">Rechercher</button>
-      </form>
+<div class="box">
+  <h2>Recherche d'informations</h2>
+  <p>Colle une URL ou un numéro :</p>
 
-      <p class="hint" id="hint">Le fetch d'une page externe peut échouer à cause du CORS. Si tu veux une récupération fiable pour tous les sites, exécute un petit backend (ex: Node/Express) qui fait le fetch côté serveur.</p>
+  <input id="query" type="text" placeholder="ex: google.com ou 0612345678">
+  <button onclick="startSearch()">Rechercher</button>
 
-      <div id="result" class="result"></div>
-    </div>
-  </div>
+  <div id="result" class="result"></div>
+</div>
+
 
 <script>
-/* ---- Helpers ---- */
-function looksLikeUrl(s) {
-  // détecte s'il contient un domaine / schéma
-  const urlRegex = /^(https?:\\/\\/)?([\\w-]+\\.)+[\\w-]+(\\/.*)?$/i;
-  return urlRegex.test(s.trim());
-}
-function ensureProtocol(s) {
-  if (!/^https?:\\/\\//i.test(s)) return 'http://' + s;
-  return s;
+function isUrl(text) {
+  const exp = /^(https?:\/\/)?([\w-]+\.)+[\w-]+/i;
+  return exp.test(text);
 }
 
-/* ---- DOM ---- */
-const form = document.getElementById('form');
-const queryEl = document.getElementById('query');
-const resultEl = document.getElementById('result');
-const searchBtn = document.getElementById('searchBtn');
+function ensureHttp(url) {
+  return url.startsWith("http") ? url : "https://" + url;
+}
 
-form.addEventListener('submit', handleSearch);
-searchBtn.addEventListener('click', handleSearch);
+async function startSearch() {
+  const q = document.getElementById("query").value.trim();
+  const out = document.getElementById("result");
+  out.innerHTML = "";
 
-async function handleSearch(e) {
-  e && e.preventDefault();
-  resultEl.innerHTML = '';
-  const raw = queryEl.value.trim();
-  if (!raw) {
-    resultEl.innerHTML = '<p class="error">Entrez une URL ou un numéro.</p>';
+  if (!q) {
+    out.innerHTML = "<p class='error'>Veuillez entrer une URL ou un numéro.</p>";
     return;
   }
 
-  // Détecter URL ou numéro
-  if (looksLikeUrl(raw)) {
-    await lookupUrl(raw);
-  } else {
-    lookupPhone(raw);
-  }
+  if (isUrl(q)) return lookupURL(q);
+  return lookupPhone(q);
 }
 
-/* ---- URL lookup (via proxy CORS public) ---- */
-async function lookupUrl(input) {
-  const url = ensureProtocol(input);
-  const proxyBase = 'https://api.allorigins.win/raw?url='; // proxy gratuit (limites)
-  resultEl.innerHTML = '<p class="muted">Récupération de la page… (via proxy CORS public)</p>';
+/* ------------------- LOOKUP URL ------------------- */
+async function lookupURL(url) {
+  const out = document.getElementById("result");
+  const finalUrl = ensureHttp(url);
+
+  out.innerHTML = "Analyse en cours...";
+
+  // Proxy stable (allorigins + JSON mode)
+  const api = "https://api.allorigins.win/get?url=" + encodeURIComponent(finalUrl);
 
   try {
-    const fetchUrl = proxyBase + encodeURIComponent(url);
-    const resp = await fetch(fetchUrl, { method: 'GET' });
+    const req = await fetch(api);
+    const data = await req.json();
 
-    if (!resp.ok) {
-      resultEl.innerHTML = `<p class="error">Échec HTTP (${resp.status}). Impossible de récupérer la page via le proxy.</p>`;
-      return;
-    }
+    const html = data.contents;
 
-    const text = await resp.text();
-
-    // Parser le HTML pour extraire title / meta / favicon / snippet
+    // Parse HTML
     const parser = new DOMParser();
-    const doc = parser.parseFromString(text, 'text/html');
+    const doc = parser.parseFromString(html, "text/html");
 
-    const title = (doc.querySelector('head > title') && doc.querySelector('head > title').innerText) || null;
-    const metaDesc = (doc.querySelector('meta[name=\"description\"]') && doc.querySelector('meta[name=\"description\"]').getAttribute('content')) ||
-                     (doc.querySelector('meta[property=\"og:description\"]') && doc.querySelector('meta[property=\"og:description\"]').getAttribute('content')) ||
-                     null;
+    const title = doc.querySelector("title")?.innerText || "(Aucun titre)";
+    const desc = doc.querySelector('meta[name=\"description\"]')?.content || "Aucune description";
+    const favicon = doc.querySelector("link[rel*='icon']")?.href || finalUrl + "/favicon.ico";
 
-    // favicon detection
-    const iconLink = doc.querySelector('link[rel~=\"icon\"]') || doc.querySelector('link[rel=\"shortcut icon\"]') || doc.querySelector('link[rel=\"apple-touch-icon\"]');
-    let favicon = iconLink ? iconLink.getAttribute('href') : null;
-    if (favicon) {
-      try {
-        // rendre URL absolue si besoin
-        const base = new URL(url);
-        favicon = new URL(favicon, base).toString();
-      } catch(err) {
-        // ignore
-      }
-    } else {
-      // fallback /favicon.ico
-      try { favicon = new URL('/favicon.ico', new URL(url)).toString(); } catch(e){ favicon = null; }
-    }
+    let textContent = doc.body?.innerText || "";
+    textContent = textContent.replace(/\s+/g, " ").trim().slice(0, 500);
 
-    // snippet: premier texte significatif
-    let bodyText = '';
-    if (doc.body) {
-      bodyText = doc.body.innerText.replace(/\\s+/g, ' ').trim();
-    }
-    const snippet = bodyText.slice(0, 800);
-
-    // Affichage résultats
-    resultEl.innerHTML = `
-      <div class="kv field">
-        <div>
-          ${favicon ? `<img src="${favicon}" alt="favicon" class="favicon" onerror="this.style.display='none'">` : ''}
-        </div>
-        <div style="flex:1">
-          <div style="display:flex;align-items:center;gap:10px;justify-content:space-between">
-            <div>
-              <div style="font-weight:600">${escapeHtml(title || url)}</div>
-              <div style="font-size:13px;color:var(--muted)">${escapeHtml(url)}</div>
-            </div>
-            <div><span class="badge">récupéré via proxy</span></div>
-          </div>
-          ${metaDesc ? `<p style="margin-top:8px" class="muted">${escapeHtml(metaDesc)}</p>` : ''}
-        </div>
-      </div>
-
-      <div class="field">
-        <strong>Extrait :</strong>
-        <div class="snippet">${escapeHtml(snippet || '(aucun texte trouvé)')}</div>
-      </div>
-
-      <div class="field">
-        <strong>Détails techniques</strong>
-        <div class="muted" style="margin-top:6px">Remarque : le proxy public masque le code de statut original et certains en-têtes. Pour obtenir le statut HTTP réel / en-têtes, utilisez un fetch côté serveur (backend).</div>
-      </div>
+    out.innerHTML = `
+      <img class="favicon" src="${favicon}" onerror="this.style.display='none'">
+      <h3>${title}</h3>
+      <p><strong>Description :</strong> ${desc}</p>
+      <p><strong>URL :</strong> ${finalUrl}</p>
+      <p><strong>Extrait :</strong></p>
+      <div class="snippet">${textContent}</div>
     `;
-  } catch (err) {
-    resultEl.innerHTML = `<p class="error">Erreur lors de la récupération : ${escapeHtml(err.message)}</p>
-      <p class="muted">Solutions :<br>
-      • Utiliser un backend (Node/Express) qui fait le fetch côté serveur (recommandé).<br>
-      • Ou essayer un autre proxy CORS. Les proxys publics ont des limites et peuvent échouer.</p>`;
+
+  } catch(e) {
+    out.innerHTML = `<p class="error">Impossible de récupérer cette URL (CORS / Proxy).  
+    Essaie une autre URL.</p>`;
   }
 }
 
-/* ---- Phone lookup (libphonenumber-js) ---- */
-function lookupPhone(raw) {
+/* ------------------- LOOKUP PHONE ------------------- */
+function lookupPhone(num) {
+  const out = document.getElementById("result");
+
   try {
-    // util: essayer avec numéro tel national (FR par défaut si pas d'indicatif)
-    const input = raw.replace(/[\\s\\-().]/g, '');
-    // lib export is in global libphonenumber (bundle)
+    const clean = num.replace(/[\s().-]/g, "");
     const { parsePhoneNumberFromString } = libphonenumber;
-    let phone;
-    // essaye en tant que numéro international s'il commence par +
-    if (input.startsWith('+')) {
-      phone = parsePhoneNumberFromString(input);
-    } else {
-      // par défaut FR (tu peux changer 'FR' si tu veux)
-      phone = parsePhoneNumberFromString(input, 'FR');
-    }
+    const phone = parsePhoneNumberFromString(clean, "FR");
 
-    if (!phone) {
-      resultEl.innerHTML = `<p class="error">Impossible d'analyser le numéro.</p>`;
-      return;
-    }
+    if (!phone) throw new Error("numéro non reconnu");
 
-    const international = phone.formatInternational();
-    const national = phone.formatNational();
-    const country = phone.country || '—';
-    const valid = phone.isValid();
-    const type = (phone.getType && phone.getType()) || '—';
-
-    resultEl.innerHTML = `
-      <div class="field"><strong>Numéro analysé</strong></div>
-      <div class="field">
-        <div class="kv"><strong>Entrée :</strong><div>${escapeHtml(raw)}</div></div>
-        <div class="kv"><strong>International :</strong><div>${escapeHtml(international)}</div></div>
-        <div class="kv"><strong>National :</strong><div>${escapeHtml(national)}</div></div>
-        <div class="kv"><strong>Pays (code) :</strong><div>${escapeHtml(country)}</div></div>
-        <div class="kv"><strong>Valide :</strong><div>${valid ? '<span class=\"badge\">Oui</span>' : '<span class=\"error\">Non</span>'}</div></div>
-        <div class="kv"><strong>Type :</strong><div>${escapeHtml(String(type))}</div></div>
-      </div>
-      <div class="field">
-        <small class="muted">Astuce : pour plus d'infos (opérateur, localisation) il faut interroger un service payant d'API de lookup.</small>
-      </div>
+    out.innerHTML = `
+      <h3>Analyse du numéro</h3>
+      <p><strong>Format international :</strong> ${phone.formatInternational()}</p>
+      <p><strong>Valide :</strong> ${phone.isValid() ? "Oui ✔️" : "Non ❌"}</p>
+      <p><strong>Pays détecté :</strong> ${phone.country || "?"}</p>
+      <p><strong>Type :</strong> ${phone.getType() || "Inconnu"}</p>
     `;
-  } catch (err) {
-    resultEl.innerHTML = `<p class="error">Erreur d'analyse : ${escapeHtml(err.message)}</p>`;
+  } catch(e) {
+    out.innerHTML = `<p class="error">Numéro invalide.</p>`;
   }
 }
-
-/* ---- Utilities ---- */
-function escapeHtml(s) {
-  if (!s && s !== 0) return '';
-  return String(s)
-    .replaceAll('&','&amp;')
-    .replaceAll('<','&lt;')
-    .replaceAll('>','&gt;')
-    .replaceAll('"','&quot;')
-    .replaceAll("'",'&#39;');
-}
-
 </script>
+
 </body>
 </html>
