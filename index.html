@@ -2,124 +2,137 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Lookup — URL & Numéro</title>
-
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lookup Pro — Recherche URL & Numéro</title>
   <style>
-    body { font-family: Arial; background:#f5f6fa; padding:40px; }
-    .box { max-width:700px; margin:auto; background:white; padding:20px; border-radius:12px; box-shadow:0 4px 18px rgba(0,0,0,0.08); }
-    input { width:80%; padding:12px; border-radius:8px; border:1px solid #ccc; }
-    button { padding:12px 18px; border-radius:8px; border:0; background:#0066ff; color:white; cursor:pointer; }
-    button:hover { opacity:0.9; }
-    .result { margin-top:20px; }
-    .error { color:#c0392b; font-weight:bold; }
-    .snippet { background:#f0f2f7; padding:10px; border-radius:6px; white-space:pre-wrap; }
-    img.favicon { width:40px; height:40px; border-radius:6px; margin-bottom:10px; }
-  </style>
+    :root{
+      --bg:#060b13;
+      --card:#0b1625;
+      --accent:#3abff8;
+      --accent2:#06b6d4;
+      --text:#e8f0fa;
+      --muted:#9aa4b2;
+    }
+    *{box-sizing:border-box;font-family:Inter,system-ui,Arial}
+    body{background:linear-gradient(180deg,#04070e,#0a1523);color:var(--text);padding:40px;margin:0}
+    .wrap{max-width:900px;margin:auto}
 
-  <script src="https://unpkg.com/libphonenumber-js@1.9.48/bundle/libphonenumber-js.min.js"></script>
+    .title-area{text-align:center;margin-bottom:28px}
+    h1{font-size:38px;margin:0;background:linear-gradient(90deg,#3abff8,#06b6d4);-webkit-background-clip:text;color:transparent}
+    .sub{color:var(--muted);margin-top:6px;font-size:15px}
+
+    .search-card{background:rgba(255,255,255,0.03);padding:22px;border-radius:18px;box-shadow:0 0 40px rgba(0,0,0,0.3);backdrop-filter:blur(6px)}
+
+    .controls{display:flex;gap:10px}
+    input{flex:1;padding:14px 16px;border-radius:12px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03);color:var(--text);font-size:15px}
+    button{padding:14px 18px;border:0;border-radius:12px;font-size:15px;font-weight:600;background:linear-gradient(90deg,#3abff8,#06b6d4);color:#00131e;cursor:pointer;transition:0.2s}
+    button:hover{opacity:0.85}
+
+    .result{margin-top:22px;background:rgba(255,255,255,0.02);padding:22px;border-radius:14px;display:none}
+    .block-title{font-size:18px;font-weight:600;margin-top:18px;margin-bottom:6px;color:var(--accent2)}
+    .kv{display:flex;gap:10px;margin:4px 0;font-size:14px}
+    .kv strong{width:140px;color:var(--accent)}
+    .muted{color:var(--muted);font-size:14px}
+    pre{background:#0a121b;padding:14px;border-radius:10px;color:#b7cbe6;font-size:13px;white-space:pre-wrap;overflow:auto}
+
+    @media(max-width:600px){
+      .controls{flex-direction:column}
+      input,button{width:100%}
+    }
+  </style>
 </head>
 <body>
+<div class="wrap">
 
-<div class="box">
-  <h2>Recherche d'informations</h2>
-  <p>Colle une URL ou un numéro :</p>
+  <div class="title-area">
+    <h1>Lookup Pro</h1>
+    <div class="sub">Analyse avancée d'URL et de numéros — WHOIS, SSL, métadonnées, opérateurs…</div>
+  </div>
 
-  <input id="query" type="text" placeholder="ex: google.com ou 0612345678">
-  <button onclick="startSearch()">Rechercher</button>
+  <div class="search-card">
+    <div class="controls">
+      <input id="q" type="text" placeholder="Ex: https://exemple.com   ou   +33612345678">
+      <button id="search">Rechercher</button>
+    </div>
+  </div>
 
   <div id="result" class="result"></div>
+
 </div>
 
-
 <script>
-function isUrl(text) {
-  const exp = /^(https?:\/\/)?([\w-]+\.)+[\w-]+/i;
-  return exp.test(text);
+const API_BASE = "https://TON_BACKEND.example.com/api"; // modifie ici
+
+function escapeHtml(x){return x?String(x).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])):''}
+
+function show(html){const r=document.getElementById('result');r.innerHTML=html;r.style.display='block'}
+function loading(){show('<div class=muted>Recherche…</div>')}
+function err(m){show(`<div style='color:#ff7b7b;font-weight:600'>${escapeHtml(m)}</div>`) }
+
+async function search(){
+  const q=document.getElementById('q').value.trim();
+  if(!q) return err("Tape quelque chose.");
+  loading();
+
+  const isUrl = /^(https?:\/\/)?([\w-]+\.)+[\w-]+/i.test(q);
+
+  try{
+    const res = await fetch(`${API_BASE}/${isUrl?'inspect':'phone'}`,{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(isUrl?{query:q}:{number:q})
+    });
+    const data = await res.json();
+    if(!res.ok) return err(data.error||"Erreur serveur");
+    isUrl? renderUrl(data) : renderPhone(data);
+  }catch(e){err(e.message)}
 }
 
-function ensureHttp(url) {
-  return url.startsWith("http") ? url : "https://" + url;
+document.getElementById('search').onclick=search;
+document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter') search()});
+
+function renderUrl(d){
+  let html = `<div class='block-title'>${escapeHtml(d.title||d.url)}</div>`;
+  html += `<div class='muted'>${escapeHtml(d.url)}</div>`;
+
+  html += `<div class='block-title'>META</div>`;
+  html += kv('Titre', d.title);
+  html += kv('Description', d.description);
+  html += kv('Favicon', d.favicon?`<img src='${d.favicon}' style='width:32px;border-radius:6px'>`:'Aucun');
+
+  html += `<div class='block-title'>WHOIS</div>`;
+  if(d.whois){
+    html += kv('Domaine', d.whois.domain);
+    html += kv('Créé le', d.whois.created);
+    html += kv('Expire le', d.whois.expires);
+    html += kv('Registrar', d.whois.registrar);
+    html += kv('Nameservers', (d.whois.nameservers||[]).join(', '));
+    html += kv('Owner (raw)', d.whois.owner||'-');
+  } else html += `<div class='muted'>Aucun WHOIS.</div>`;
+
+  html += `<div class='block-title'>Serveur & SSL</div>`;
+  html += kv('Status', d.status);
+  html += kv('Server', d.headers?.server);
+  html += kv('Content-Type', d.headers?.['content-type']);
+  if(d.ssl){ html += kv('SSL', `${d.ssl.valid_from} → ${d.ssl.valid_to}`); }
+
+  html += `<div class='block-title'>Extrait</div>`;
+  html += `<pre>${escapeHtml(d.snippet||'')}</pre>`;
+
+  show(html);
 }
 
-async function startSearch() {
-  const q = document.getElementById("query").value.trim();
-  const out = document.getElementById("result");
-  out.innerHTML = "";
-
-  if (!q) {
-    out.innerHTML = "<p class='error'>Veuillez entrer une URL ou un numéro.</p>";
-    return;
-  }
-
-  if (isUrl(q)) return lookupURL(q);
-  return lookupPhone(q);
+function renderPhone(d){
+  let html = `<div class='block-title'>Numéro</div>`;
+  html += kv('Entrée', d.raw);
+  html += kv('International', d.international);
+  html += kv('National', d.national);
+  html += kv('Pays', d.country);
+  html += kv('Valide', d.valid);
+  if(d.operator) html += kv('Opérateur', d.operator);
+  if(d.geolocation) html += kv('Région', d.geolocation);
+  show(html);
 }
 
-/* ------------------- LOOKUP URL ------------------- */
-async function lookupURL(url) {
-  const out = document.getElementById("result");
-  const finalUrl = ensureHttp(url);
-
-  out.innerHTML = "Analyse en cours...";
-
-  // Proxy stable (allorigins + JSON mode)
-  const api = "https://api.allorigins.win/get?url=" + encodeURIComponent(finalUrl);
-
-  try {
-    const req = await fetch(api);
-    const data = await req.json();
-
-    const html = data.contents;
-
-    // Parse HTML
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
-
-    const title = doc.querySelector("title")?.innerText || "(Aucun titre)";
-    const desc = doc.querySelector('meta[name=\"description\"]')?.content || "Aucune description";
-    const favicon = doc.querySelector("link[rel*='icon']")?.href || finalUrl + "/favicon.ico";
-
-    let textContent = doc.body?.innerText || "";
-    textContent = textContent.replace(/\s+/g, " ").trim().slice(0, 500);
-
-    out.innerHTML = `
-      <img class="favicon" src="${favicon}" onerror="this.style.display='none'">
-      <h3>${title}</h3>
-      <p><strong>Description :</strong> ${desc}</p>
-      <p><strong>URL :</strong> ${finalUrl}</p>
-      <p><strong>Extrait :</strong></p>
-      <div class="snippet">${textContent}</div>
-    `;
-
-  } catch(e) {
-    out.innerHTML = `<p class="error">Impossible de récupérer cette URL (CORS / Proxy).  
-    Essaie une autre URL.</p>`;
-  }
-}
-
-/* ------------------- LOOKUP PHONE ------------------- */
-function lookupPhone(num) {
-  const out = document.getElementById("result");
-
-  try {
-    const clean = num.replace(/[\s().-]/g, "");
-    const { parsePhoneNumberFromString } = libphonenumber;
-    const phone = parsePhoneNumberFromString(clean, "FR");
-
-    if (!phone) throw new Error("numéro non reconnu");
-
-    out.innerHTML = `
-      <h3>Analyse du numéro</h3>
-      <p><strong>Format international :</strong> ${phone.formatInternational()}</p>
-      <p><strong>Valide :</strong> ${phone.isValid() ? "Oui ✔️" : "Non ❌"}</p>
-      <p><strong>Pays détecté :</strong> ${phone.country || "?"}</p>
-      <p><strong>Type :</strong> ${phone.getType() || "Inconnu"}</p>
-    `;
-  } catch(e) {
-    out.innerHTML = `<p class="error">Numéro invalide.</p>`;
-  }
-}
+function kv(k,v){return `<div class='kv'><strong>${escapeHtml(k)}</strong><div>${v?escapeHtml(String(v)):''}</div></div>`}
 </script>
 
 </body>
